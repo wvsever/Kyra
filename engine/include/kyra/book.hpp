@@ -37,7 +37,8 @@ struct CustomerAml {
     bool viban = false, prepaid = false, multi_prepaid = false, factoring = false, insured = false;
     bool rto = false, custody = false, portfolio = false, professional = false, private_banking = false;
     bool tcsp = false, crypto = false, crypto_custody = false, safe_box = false;
-    std::uint8_t fund = 0;         // W_04.11 investor bucket: 0 UCITS retail, 1 UCITS prof, 2 AIF retail, 3 AIF prof
+    bool fund_investor = false;    // invests in the group's managed UCITS/AIFs (K018)
+    std::uint8_t fund = 0;         // W_04.11 investor bucket: 0 UCITS retail, 1 UCITS prof, 2 AIF retail, 3 AIF prof (fund investors only)
     double loan = 0;               // outstanding loan (consumer loan / mortgage products)
     bool loan_new = false, loan_third_party = false, loan_cash_collateral = false, loan_premature = false;
     bool loan_unspecified = false;

@@ -274,9 +274,9 @@ Module aggregate_ra(const Book& b) {
     o.c("W_04.10", "C0140", money(cvalue * 0.25)); o.c("W_04.10", "C0150", num(tr_c)); o.c("W_04.10", "C0160", num(tr_n));
     o.c("W_04.10", "C0170", num(part(tr_n, 12))); o.c("W_04.10", "C0180", num(part(tr_n, 9)));     // v904960
 
-    // W_04.11 funds: investor buckets over all customers (K018, v905230 with v903846).
+    // W_04.11 funds: investor buckets over fund investors only (K018, v905230; v903846 is a broken EBA rule).
     long long fund[4] = {0, 0, 0, 0};
-    for (const auto* c : cs) ++fund[c->aml.fund];
+    for (const auto* c : cs) if (c->aml.fund_investor) ++fund[c->aml.fund];
     o.c("W_04.11", "C0010", num(fund[0])); o.c("W_04.11", "C0020", num(fund[1]));
     o.c("W_04.11", "C0030", money(a.ucits_aum));
     o.c("W_04.11", "C0040", num(fund[2])); o.c("W_04.11", "C0050", num(fund[3]));
@@ -299,7 +299,8 @@ Module aggregate_ra(const Book& b) {
         Geo& g = geo[c->residence];
         (c->aml.legal ? g.le : g.np)++;
         g.np_pep += !c->aml.legal && c->pep; g.le_pep += c->aml.legal && c->aml.le_pep;
-        ++g.investors; g.ciu += c->aml.fund_flow; g.aum += c->aml.portfolio ? c->aml.aum : 0;
+        if (c->aml.fund_investor) { ++g.investors; g.ciu += c->aml.fund_flow; }
+        g.aum += c->aml.portfolio ? c->aml.aum : 0;
     }
     for (const auto& t : b.transactions) {
         if (!by_id.count(t.customer)) continue;
@@ -319,7 +320,9 @@ Module aggregate_ra(const Book& b) {
         o.cell(s, "L005", "C0040", num(g.np_pep), row); o.cell(s, "L005", "C0050", num(g.le_pep), row);
         o.cell(s, "L005", "C0060", num(g.tx.n_in), row); o.cell(s, "L005", "C0070", money(g.tx.v_in), row);
         o.cell(s, "L005", "C0080", num(g.tx.n_out), row); o.cell(s, "L005", "C0090", money(g.tx.v_out), row);
-        o.cell(s, "L005", "C0100", money(g.ciu), row); o.cell(s, "L005", "C0110", num(g.investors), row);
+        if (g.investors > 0) {   // countries without fund investors: CIU columns blank (K018)
+            o.cell(s, "L005", "C0100", money(g.ciu), row); o.cell(s, "L005", "C0110", num(g.investors), row);
+        }
         o.cell(s, "L005", "C0120", money(g.aum), row); o.cell(s, "L005", "C0130", num(g.respondents), row);
         o.cell(s, "L005", "C0140", money(g.resp_in), row); o.cell(s, "L005", "C0150", money(g.resp_out), row);
         o.cell(s, "L005", "C0160", num(g.branches), row); o.cell(s, "L005", "C0170", num(g.subsidiaries), row);

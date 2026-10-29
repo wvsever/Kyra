@@ -106,7 +106,10 @@ int main(int argc, char** argv) {
     auto g = [&](int r, const char* c) { auto it = geo.find(std::make_pair(r, std::string(c))); return it == geo.end() ? 0.0 : it->second; };
     int geo_rows = 0;
     for (const auto& f : ra.facts) if (f.sheet == "W_05.01" && f.ordinal > geo_rows) geo_rows = f.ordinal;
-    for (int r = 1; r <= geo_rows; ++r) CHECK(g(r, "C0110") == g(r, "C0020") + g(r, "C0030"));   // v903846
+    // v903846 (c0110 = c0020 + c0030) is a broken EBA rule (docs/broken_rules.csv): fund investors are a subset (K018).
+    double fund_total = v["W_04.11 C0010"] + v["W_04.11 C0020"] + v["W_04.11 C0040"] + v["W_04.11 C0050"];
+    CHECK(fund_total > 0 && fund_total < 0.15 * v["W_02.01 C0010"]);
+    for (int r = 1; r <= geo_rows; ++r) CHECK(g(r, "C0110") <= g(r, "C0020") + g(r, "C0030"));
     CHECK(v["W_07.03 C0040"] + v["W_07.03 C0050"] + v["W_07.03 C0060"] + v["W_07.03 C0070"] <= v["W_02.01 C0010"]);
     CHECK(v["W_07.04 C0070"] <= v["W_07.04 C0060"]);                                              // v904974
     CHECK(v["W_03.04 C0040"] <= v["W_03.04 C0030"] && v["W_03.04 C0130"] <= v["W_03.04 C0120"]);

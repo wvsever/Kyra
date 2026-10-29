@@ -59,7 +59,7 @@ Scope = head office + branches (K004). Customer flags are quotas from the second
 | W_04.04 | `AmlActivity.respondents` |
 | W_04.07, W_04.09, W_04.10, W_04.12 | tcsp, crypto_custody, crypto (value per customer, operation counts K015), safe_box flags |
 | W_04.08, W_04.13 | `AmlActivity` counts |
-| W_04.11 | fund investor bucket of every customer (K018); fund AUM from `AmlActivity` |
+| W_04.11 | fund investor buckets, fund investors only (about 5% of natural persons, 3% of legal entities, K018); fund AUM from `AmlActivity` |
 | W_05.01 | per country: customers by residence, transactions and remittances by counterparty country, respondents, establishments (K021) |
 | W_06.01 | `AmlActivity.distribution` |
 | W_07.01-W_07.07 | controls (K022): risk classes 4-scale (K017), CDD flags, alerts from transactions, outbound transfers |

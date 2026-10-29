@@ -8,3 +8,4 @@ T5 | Enumeration values are FC dropdown labels, not DPM member codes; country la
 T6 | Supervisor must match the member state (v904924_m, v905233_m-v905241_m): BE -> BE_NBB/BE_FSMA/BE-FPS Economy.
 T8 | PMR accepts W_01.02 / W_01.03 rows without the country key (c0030) but drops them from the xBRL-CSV export; the filing indicator stays and e904551_e_0 then fails. Write comment rows with all three keys (template, column, country), i.e. on W_05.01 / W_06.01 cells.
 T7 | ctest runs from the slot path C:/bslot/kyra<i>, not the worktree; tests take paths from arguments, never from cwd.
+T9 | v903846 (W_05.01 c0110 = c0020 + c0030) is a broken EBA rule (c0110 Investors lacks the fund dimension). Expected unsatisfied per country row; never shape data to it. Register: docs/broken_rules.csv (K018).

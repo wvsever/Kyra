@@ -198,10 +198,12 @@ void enrich_aml(Book& b, std::uint64_t seed) {
     quota(r, np, 0.02, [&](Customer& c) { c.aml.crypto = true; c.aml.crypto_value = r.amount(8.0, 1.0); });
     quota(r, np, 0.015, [](Customer& c) { c.aml.crypto_custody = true; });
     quota(r, np, 0.03, [](Customer& c) { c.aml.safe_box = true; });
+    // W_04.11 investor buckets (K018): fund investors are a small subset of customers, about 5% of natural
+    // persons as retail (UCITS/AIF 70/30) and a few legal entities as professional (UCITS/AIF 55/45).
+    quota(r, np, 0.05, [&](Customer& c) { c.aml.fund_investor = true; c.aml.fund = r.below(100) < 70 ? 0 : 2; });
+    quota(r, le, 0.03, [&](Customer& c) { c.aml.fund_investor = true; c.aml.fund = r.below(100) < 55 ? 1 : 3; });
     for (auto* c : all) {
-        // W_04.11 investor buckets (K018): every customer is a fund investor through the group's funds.
-        c->aml.fund = c->aml.legal ? (r.below(100) < 55 ? 1 : 3) : (r.below(100) < 70 ? 0 : 2);
-        c->aml.fund_flow = r.amount(7.6, 1.0);
+        if (c->aml.fund_investor) c->aml.fund_flow = r.amount(7.6, 1.0);
         if (c->product == "consumer loan" || c->product == "mortgage") {
             c->aml.loan = c->product == "mortgage" ? r.amount(12.15, 0.5) : r.amount(9.4, 0.7);
             c->aml.loan_new = c->aml.is_new || r.below(100) < 12;
