@@ -1,7 +1,7 @@
 <#
   Kyra push gate. pwsh -NoProfile -File tools/gate.ps1 [-Preset msvc-x64-release]
   1. configure + build + ctest via lanetools slot_build.ps1 (VS env, box token, slot, sccache server)
-  2. smoke: kyra --version-json, kyra run on the demo entity writes fc_import_AML_ELIGIBILITY.csv
+  2. smoke: kyra --version-json, kyra run on the demo entity writes fc_import_AML_ELIGIBILITY.csv and fc_import_AML_RA.csv
   sccache hits/misses: the '[slot_build] ... sccache hits' line (per-repo server; port fixed once lanetools lists kyra)
   Exit 0 only when every check ran and passed. Never claims a check it did not run.
 #>
@@ -23,6 +23,9 @@ $out = Join-Path $root "build/$Preset/gate_smoke"
 & $exe run --out $out | Write-Output
 $csv = Join-Path $out 'factsconverter/fc_import_AML_ELIGIBILITY.csv'
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path $csv)) { Write-Output "[gate] FAIL: kyra run (exit $LASTEXITCODE)"; exit 1 }
+& $exe run --out $out --module aml_ra | Write-Output
+$csv = Join-Path $out 'factsconverter/fc_import_AML_RA.csv'
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path $csv)) { Write-Output "[gate] FAIL: kyra run aml_ra (exit $LASTEXITCODE)"; exit 1 }
 Write-Output "[gate] smoke: PASS ($v)"
 
 Write-Output '[gate] PASS'

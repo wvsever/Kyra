@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstdio>
 #include <stdexcept>
+#include <utility>
 
 #include "kyra/pipeline.hpp"
 
@@ -105,7 +106,155 @@ Book generate(const std::string& profile, const std::string& ref_date, std::uint
             b.customers.push_back(std::move(c));
         }
     }
+    enrich_aml(b, seed);
     return b;
+}
+
+namespace {
+
+// k = max(1, round(rate * pool size)) distinct members, partial Fisher-Yates (quota, never zero; K013).
+template <class F>
+void quota(Rng& r, std::vector<Customer*> pool, double rate, F set) {
+    if (pool.empty()) return;
+    std::size_t k = std::size_t(std::llround(rate * double(pool.size())));
+    if (k < 1) k = 1;
+    if (k > pool.size()) k = pool.size();
+    for (std::size_t i = 0; i < k; ++i) {
+        std::size_t j = i + std::size_t(r.next() % std::uint64_t(pool.size() - i));
+        std::swap(pool[i], pool[j]);
+        set(*pool[i]);
+    }
+}
+
+template <class P>
+std::vector<Customer*> where(std::vector<Customer*>& all, P pred) {
+    std::vector<Customer*> v;
+    for (auto* c : all) if (pred(*c)) v.push_back(c);
+    return v;
+}
+
+}  // namespace
+
+// Second PRNG stream (K013): AML attributes, transaction kinds and activity volumes for aml_ra. Touches no field
+// that aml_eligibility reads except residence of non-FPS home customers (moved to a non-EEA state, still non-FPS).
+void enrich_aml(Book& b, std::uint64_t seed) {
+    Rng r{seed ^ 0x4B5952415F414D4Cull};   // "KYRA_AML"
+    std::vector<Customer*> ent;            // the legal entity: head office + branches (K004)
+    for (auto& c : b.customers)
+        if (c.unit == 0 || b.units[c.unit].structure == "Branch") ent.push_back(&c);
+    auto all = ent;
+    quota(r, all, 0.14, [](Customer& c) { c.aml.legal = true; });
+    auto np = where(all, [](const Customer& c) { return !c.aml.legal; });
+    auto le = where(all, [](const Customer& c) { return c.aml.legal; });
+    // Non-EEA corporates booked at the head office (K016): home-resident, so never FPS customers.
+    auto home_le = where(le, [&](const Customer& c) { return c.unit == 0 && c.residence == b.units[0].country; });
+    const char* non_eea[] = {"SWITZERLAND", "UNITED KINGDOM", "UNITED STATES"};
+    int ne = 0;
+    quota(r, home_le, 0.03, [&](Customer& c) { c.residence = non_eea[ne++ % 3]; c.aml.professional = true; });
+    if (where(np, [](const Customer& c) { return c.pep; }).empty()) quota(r, np, 0.004, [](Customer& c) { c.pep = true; });
+    quota(r, le, 0.01, [](Customer& c) { c.aml.le_pep = true; });
+    quota(r, all, 0.09, [](Customer& c) { c.aml.is_new = true; });
+    auto fresh = where(all, [](const Customer& c) { return c.aml.is_new; });
+    quota(r, fresh, 0.35, [](Customer& c) { c.aml.remote = true; });
+    auto not_remote = where(fresh, [](const Customer& c) { return !c.aml.remote; });
+    quota(r, not_remote, 0.15, [](Customer& c) { c.aml.third_party = true; });
+    quota(r, where(fresh, [](const Customer& c) { return c.aml.third_party; }), 0.3,
+          [](Customer& c) { c.aml.third_unsupervised = true; });
+    quota(r, le, 0.08, [](Customer& c) { c.aml.complex = true; });
+    quota(r, le, 0.03, [](Customer& c) { c.aml.bo_high_risk = true; });
+    quota(r, all, 0.02, [](Customer& c) { c.aml.high_risk_activity = true; });
+    quota(r, all, 0.005, [](Customer& c) { c.aml.fiu_request = true; });
+    // W_07.03 four-class scale (K017): low stays low, medium splits 60/40 medium-low/medium-high, high stays high.
+    for (auto* c : all)
+        c->aml.risk4 = c->risk == RiskClass::Low ? 0 : c->risk == RiskClass::High ? 3 : (r.below(100) < 60 ? 1 : 2);
+    quota(r, fresh, 0.03, [](Customer& c) { c.aml.no_profile = true; });   // onboarded, profile pending
+    quota(r, le, 0.005, [](Customer& c) { c.aml.bo_not_identified = true; });
+    quota(r, le, 0.015, [](Customer& c) { c.aml.bo_not_verified = true; });
+    quota(r, all, 0.004, [](Customer& c) { c.aml.missing_docs = true; });
+    quota(r, all, 0.008, [](Customer& c) { c.aml.cdd_gap = true; });
+    quota(r, all, 0.12, [](Customer& c) { c.aml.review_due = true; });
+    quota(r, where(all, [](const Customer& c) { return c.aml.review_due; }), 0.85,
+          [](Customer& c) { c.aml.review_done = true; });
+    // Products and services (K015).
+    quota(r, le, 0.10, [](Customer& c) { c.aml.viban = true; });
+    quota(r, np, 0.05, [](Customer& c) { c.aml.prepaid = true; });
+    quota(r, where(np, [](const Customer& c) { return c.aml.prepaid; }), 0.04, [](Customer& c) { c.aml.multi_prepaid = true; });
+    quota(r, le, 0.03, [&](Customer& c) { c.aml.factoring = true; c.aml.factoring_value = r.amount(12.4, 0.8); });
+    quota(r, np, 0.06, [&](Customer& c) { c.aml.insured = true; c.aml.premium = r.amount(7.8, 0.6); });
+    quota(r, np, 0.06, [](Customer& c) { c.aml.rto = true; });
+    quota(r, le, 0.20, [](Customer& c) { c.aml.rto = true; c.aml.professional = true; });
+    quota(r, np, 0.04, [](Customer& c) { c.aml.custody = true; });
+    quota(r, le, 0.15, [](Customer& c) { c.aml.custody = true; c.aml.professional = true; });
+    for (auto* c : all) if (c->aml.legal && c->residence != b.units[c->unit].country && c->aml.professional) {
+        bool eea = c->residence != "SWITZERLAND" && c->residence != "UNITED KINGDOM" && c->residence != "UNITED STATES";
+        if (!eea) c->aml.rto = c->aml.custody = true;
+    }
+    quota(r, np, 0.03, [&](Customer& c) { c.aml.portfolio = true; c.aml.aum = r.amount(12.4, 0.9); });
+    quota(r, le, 0.05, [&](Customer& c) { c.aml.portfolio = true; c.aml.professional = true; c.aml.aum = r.amount(14.5, 0.9); });
+    quota(r, where(le, [](const Customer& c) { return c.aml.portfolio; }), 0.05,
+          [&](Customer& c) { c.aml.aum = 5.5e6 + r.amount(14.0, 0.5); });   // W_04.01 c0110, W_04.03 c0010
+    quota(r, np, 0.01, [](Customer& c) { c.aml.private_banking = true; });
+    quota(r, le, 0.01, [](Customer& c) { c.aml.tcsp = true; });
+    quota(r, np, 0.02, [&](Customer& c) { c.aml.crypto = true; c.aml.crypto_value = r.amount(8.0, 1.0); });
+    quota(r, np, 0.015, [](Customer& c) { c.aml.crypto_custody = true; });
+    quota(r, np, 0.03, [](Customer& c) { c.aml.safe_box = true; });
+    for (auto* c : all) {
+        // W_04.11 investor buckets (K018): every customer is a fund investor through the group's funds.
+        c->aml.fund = c->aml.legal ? (r.below(100) < 55 ? 1 : 3) : (r.below(100) < 70 ? 0 : 2);
+        c->aml.fund_flow = r.amount(7.6, 1.0);
+        if (c->product == "consumer loan" || c->product == "mortgage") {
+            c->aml.loan = c->product == "mortgage" ? r.amount(12.15, 0.5) : r.amount(9.4, 0.7);
+            c->aml.loan_new = c->aml.is_new || r.below(100) < 12;
+        }
+    }
+    auto loans = where(all, [](const Customer& c) { return c.aml.loan > 0; });
+    quota(r, where(loans, [](const Customer& c) { return c.product == "mortgage"; }), 0.02,
+          [](Customer& c) { c.aml.loan_third_party = true; });
+    quota(r, loans, 0.01, [](Customer& c) { c.aml.loan_cash_collateral = true; });
+    quota(r, loans, 0.03, [](Customer& c) { c.aml.loan_premature = true; });
+    quota(r, where(loans, [](const Customer& c) { return c.product == "consumer loan"; }), 0.04,
+          [](Customer& c) { c.aml.loan_unspecified = true; });
+
+    // Transaction kinds (K014). Remittances go to remittance corridors, trade finance is for legal entities.
+    std::vector<const Customer*> by_id(b.customers.size() + 1, nullptr);
+    for (const auto& c : b.customers) by_id[c.id] = &c;
+    const char* corridors[] = {"MOROCCO", "TURKEY", "ROMANIA", "POLAND", "PHILIPPINES"};
+    for (auto& t : b.transactions) {
+        const Customer& c = *by_id[t.customer];
+        int x = r.below(100);
+        if (x < 8) t.kind = TxKind::Cash;
+        else if (x < 11 && !c.aml.legal) { t.kind = TxKind::Remittance; t.counterparty_country = corridors[r.below(5)]; }
+        else if (x < 15 && c.aml.legal) t.kind = TxKind::TradeFinance;
+        else if (x < 18) t.kind = TxKind::EMoney;
+        else if (x < 20) t.kind = TxKind::CurrencyExchange;
+    }
+
+    // Activity volumes (K015), scaled to the entity's customer base.
+    AmlActivity& a = b.activity;
+    double n = double(all.size());
+    a.respondents = {{"UNITED STATES", 2, r.amount(17.2, 0.3), r.amount(17.1, 0.3)},
+                     {"SWITZERLAND", 1, r.amount(16.5, 0.3), r.amount(16.4, 0.3)},
+                     {"TURKEY", 1, r.amount(15.8, 0.3), r.amount(15.9, 0.3)},
+                     {"MOROCCO", 1, r.amount(15.1, 0.3), r.amount(15.2, 0.3)}};
+    a.distribution = {{"BELGIUM", 12 + r.below(6), 3, 1, r.amount(13.2, 0.2)},
+                      {"LUXEMBOURG", 2 + r.below(3), 1, 0, r.amount(11.9, 0.2)}};
+    a.walk_in = int(n * 0.02) + 1;
+    a.walk_in_transactions = a.walk_in * 2 + r.below(a.walk_in);
+    a.reissued_vibans = 3 + r.below(10);
+    a.bin_sponsored = 1 + r.below(3);
+    a.open_funds = 4 + r.below(5);
+    a.closed_funds = 1 + r.below(3);
+    a.projects = 8 + r.below(10);
+    a.donors_high_risk = 1 + r.below(4);
+    a.projects_high_risk = 1;
+    a.surrender_value = r.amount(13.0, 0.3);
+    a.crowdfunding_value = r.amount(13.3, 0.4);
+    a.ucits_aum = r.amount(19.5, 0.2);
+    a.aif_aum = r.amount(18.6, 0.2);
+    a.aif_unlisted = a.aif_aum * 0.35;
+    double loans_out = 0;
+    for (auto* c : all) loans_out += c->aml.loan;
+    a.total_assets = std::round(loans_out / 0.62 * 100.0) / 100.0;   // loans ~62% of total assets (K019)
 }
 
 }  // namespace kyra

@@ -113,6 +113,4 @@ Module aggregate_eligibility(const Book& b) {
     return m;
 }
 
-Module aggregate_ra(const Book&) { throw std::logic_error("aml_ra: not implemented (docs/ARCHITECTURE.md, aml_ra map)"); }
-
 }  // namespace kyra

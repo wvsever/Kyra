@@ -1,4 +1,5 @@
-// Kyra unit tests (dependency-free). Usage: kyra_unit_tests <regkeys file>
+// Kyra unit tests (dependency-free). Usage: kyra_unit_tests <eligibility regkeys> <aml_ra regkeys>
+#include <cmath>
 #include <cstdio>
 #include <fstream>
 #include <map>
@@ -59,10 +60,63 @@ int main(int argc, char** argv) {
     for (const auto& f : m.facts) if (f.sheet == "V_04.01" && (f.regkey.ends_with("C0050") || f.regkey.ends_with("C0060"))) ++per_row;
     CHECK(per_row == int(2 * v0401_rows.size()));
 
-    bool threw = false;
-    try { kyra::aggregate_ra(a); } catch (const std::logic_error&) { threw = true; }
-    CHECK(threw);
+    // aml_ra: keys, types, no zeros, every template, and the cross-template rules the generator must honour.
+    std::map<std::string, std::string> ra_type;
+    if (argc >= 3) {
+        std::ifstream rr(argv[2]);
+        for (std::string l; std::getline(rr, l);) {
+            if (l.empty() || l[0] == '#') continue;
+            ra_type[l.substr(0, l.find('|'))] = l.substr(l.rfind('|') + 1);
+        }
+    }
+    CHECK(ra_type.size() == 261);
+    kyra::Module ra = kyra::aggregate_ra(a);
+    CHECK(kyra::fc_csv_text(a, ra) == kyra::fc_csv_text(b, kyra::aggregate_ra(b)));
+    std::set<std::string> sheets;
+    std::map<std::string, double> v;                       // closed cells "W_02.01 C0010" -> value
+    std::map<std::string, double> colsum;                  // open-table column sums "W_05.01 C0020"
+    std::map<std::pair<int, std::string>, double> geo;     // (W_05.01 row, column) -> value
+    for (const auto& f : ra.facts) {
+        CHECK(ra_type.count(f.regkey) == 1);
+        CHECK(!f.value.empty() && f.value != "0" && f.value != "0.00");
+        const std::string& t = ra_type[f.regkey];
+        if (t == "BOOL") CHECK(f.value == "true" || f.value == "false");
+        if (t == "PERCENTAGE") CHECK(std::stod(f.value) > 0 && std::stod(f.value) <= 1);
+        if (t == "DATE") CHECK(f.value <= a.ref_date);
+        sheets.insert(f.sheet);
+        std::string col = f.regkey.substr(f.regkey.size() - 5);
+        bool numeric = t == "INTEGER" || t == "AMOUNT" || t == "DECIMAL" || t == "PERCENTAGE";
+        if (numeric) CHECK(std::stod(f.value) > 0);
+        if (numeric && !f.ordinal) v[f.sheet + " " + col] = std::stod(f.value);
+        if (numeric && f.ordinal) colsum[f.sheet + " " + col] += std::stod(f.value);
+        if (numeric && f.sheet == "W_05.01") geo[{f.ordinal, col}] = std::stod(f.value);
+    }
+    CHECK(sheets.size() == 34);
+    auto near = [](double x, double y) { return std::fabs(x - y) < 0.01 * (1 + std::fabs(y)); };
+    CHECK(v["W_02.01 C0010"] == v["W_02.01 C0020"] + v["W_02.01 C0030"]);                        // v903768
+    CHECK(v["W_02.01 C0040"] + v["W_02.01 C0050"] <= v["W_02.01 C0010"]);                         // v904930
+    CHECK(v["W_02.01 C0080"] + v["W_02.01 C0090"] <= v["W_02.01 C0070"]);                         // v904964
+    CHECK(v["W_02.01 C0130"] <= v["W_02.01 C0030"] && v["W_02.01 C0110"] <= v["W_02.01 C0030"]);  // v903804
+    for (const char* c : {"C0020", "C0030", "C0040", "C0050"})                                    // v904976-9
+        CHECK(colsum[std::string("W_05.01 ") + c] == v[std::string("W_02.01 ") + c]);
+    CHECK(colsum["W_05.01 C0110"] == v["W_04.11 C0010"] + v["W_04.11 C0020"] + v["W_04.11 C0040"] + v["W_04.11 C0050"]);
+    CHECK(near(colsum["W_05.01 C0120"], v["W_04.01 C0100"]));                                     // v904981
+    CHECK(near(colsum["W_05.01 C0180"], v["W_04.02 C0030"]));                                     // v904982
+    CHECK(near(colsum["W_05.01 C0190"], v["W_04.02 C0040"]));                                     // v904983
+    auto g = [&](int r, const char* c) { auto it = geo.find(std::make_pair(r, std::string(c))); return it == geo.end() ? 0.0 : it->second; };
+    int geo_rows = 0;
+    for (const auto& f : ra.facts) if (f.sheet == "W_05.01" && f.ordinal > geo_rows) geo_rows = f.ordinal;
+    for (int r = 1; r <= geo_rows; ++r) CHECK(g(r, "C0110") == g(r, "C0020") + g(r, "C0030"));   // v903846
+    CHECK(v["W_07.03 C0040"] + v["W_07.03 C0050"] + v["W_07.03 C0060"] + v["W_07.03 C0070"] <= v["W_02.01 C0010"]);
+    CHECK(v["W_07.04 C0070"] <= v["W_07.04 C0060"]);                                              // v904974
+    CHECK(v["W_03.04 C0040"] <= v["W_03.04 C0030"] && v["W_03.04 C0130"] <= v["W_03.04 C0120"]);
+    CHECK(v["W_03.06 C0030"] <= v["W_03.06 C0010"] && v["W_03.06 C0040"] <= v["W_03.06 C0020"]);  // v903826
+    CHECK(v["W_04.10 C0120"] + v["W_04.10 C0130"] <= v["W_04.10 C0110"]);                         // v904958
+    CHECK(v["W_04.10 C0170"] + v["W_04.10 C0180"] <= v["W_04.10 C0160"]);                         // v904960
+    CHECK(v["W_04.11 C0010"] + v["W_04.11 C0020"] <= v["W_02.01 C0010"]);                         // v903822
+    CHECK(v["W_04.07 C0010"] <= v["W_02.01 C0030"] && v["W_07.06 C0020"] <= v["W_07.06 C0030"]);
+    CHECK(v.count("W_07.05 C0030") == 0);                                                         // v903748
 
-    std::printf("%s (%d failures, %zu facts)\n", fails ? "FAIL" : "ok", fails, m.facts.size());
+    std::printf("%s (%d failures, %zu + %zu facts)\n", fails ? "FAIL" : "ok", fails, m.facts.size(), ra.facts.size());
     return fails ? 1 : 0;
 }
