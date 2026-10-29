@@ -1,0 +1,68 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 24 },
+  "configurePresets": [
+    {
+      "name": "msvc-base",
+      "hidden": true,
+      "description": "MSVC pinned by name (LLVM on PATH would otherwise be picked). Run through tools/gate.ps1 (lanetools slot_build: VS env, box token, slot).",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "architecture": { "value": "x64", "strategy": "external" },
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "cl",
+        "CMAKE_C_COMPILER": "cl",
+        "CMAKE_AR": "lib",
+        "CMAKE_LINKER": "link",
+        "CMAKE_POLICY_DEFAULT_CMP0141": "NEW",
+        "CMAKE_MSVC_DEBUG_INFORMATION_FORMAT": "Embedded"
+      }
+    },
+    {
+      "name": "sccache",
+      "hidden": true,
+      "description": "sccache like Elara: per-repo server (port 4241, cache C:\\sccache\\kyra_bd), basedirs = slot_build slots.",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER_LAUNCHER": "C:/Tools/sccache/sccache.exe",
+        "CMAKE_CXX_COMPILER_LAUNCHER": "C:/Tools/sccache/sccache.exe"
+      },
+      "environment": {
+        "SCCACHE_DIR": "C:\\sccache\\kyra_bd",
+        "SCCACHE_CACHE_SIZE": "20G",
+        "SCCACHE_SERVER_PORT": "4241",
+        "SCCACHE_BASEDIRS": "C:/bslot/kyra0;C:/bslot/kyra1;C:/bslot/kyra2;C:/bslot/kyra3;C:/bslot/kyra4;C:/bslot/kyra5;C:/bslot/kyra6;C:/bslot/kyra7;C:/bslot/kyra8;C:/bslot/kyra9;C:/bslot/kyra10;C:/bslot/kyra11;C:/bslot/kyra12;C:/bslot/kyra13;C:/bslot/kyra14;C:/bslot/kyra15;C:/bslot/kyra16;C:/bslot/kyra17;C:/bslot/kyra18;C:/bslot/kyra19;C:/bslot/kyra20;C:/bslot/kyra21;C:/bslot/kyra22;C:/bslot/kyra23;C:/bslot/kyra24;C:/bslot/kyra25;C:/bslot/kyra26;C:/bslot/kyra27;C:/bslot/kyra28;C:/bslot/kyra29;C:/bslot/kyra30;C:/bslot/kyra31",
+        "SCCACHE_IDLE_TIMEOUT": "0"
+      }
+    },
+    {
+      "name": "msvc-x64-debug",
+      "inherits": ["sccache", "msvc-base"],
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "msvc-x64-release",
+      "inherits": ["sccache", "msvc-base"],
+      "description": "The deployable build (gate preset).",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo" }
+    },
+    {
+      "name": "msvc-x64-release-nocache",
+      "inherits": "msvc-base",
+      "description": "Release without sccache (escape hatch when the cache misbehaves).",
+      "binaryDir": "${sourceDir}/build/msvc-x64-release-nocache",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "msvc-x64-debug", "configurePreset": "msvc-x64-debug", "jobs": 8 },
+    { "name": "msvc-x64-release", "configurePreset": "msvc-x64-release", "jobs": 8 }
+  ],
+  "testPresets": [
+    {
+      "name": "gate",
+      "configurePreset": "msvc-x64-release",
+      "output": { "outputOnFailure": true },
+      "execution": { "jobs": 4, "noTestsAction": "error" }
+    }
+  ]
+}

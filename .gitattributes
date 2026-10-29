@@ -1,0 +1,2 @@
+# Golden FactsConverter CSV is compared byte for byte (CRLF line ends are part of the format).
+tests/data/golden/** -text
