@@ -55,7 +55,8 @@ std::string lei_with_check_digits(const std::string& prefix18) {
 }
 
 Book generate(const std::string& profile, const std::string& ref_date, std::uint64_t seed) {
-    if (profile != "demo") throw std::invalid_argument("unknown entity profile: " + profile + " (known: demo)");
+    if (profile != "demo" && profile != "demo_manual")
+        throw std::invalid_argument("unknown entity profile: " + profile + " (known: demo, demo_manual)");
     Book b;
     b.entity_id = profile;
     b.ref_date = ref_date;

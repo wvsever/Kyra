@@ -74,8 +74,19 @@ int main(int argc, char** argv) {
     CHECK(ra_type.size() == 261);
     kyra::Module ra = kyra::aggregate_ra(a);
     CHECK(kyra::fc_csv_text(a, ra) == kyra::fc_csv_text(b, kyra::aggregate_ra(b)));
+    {   // K025: demo_manual files c0030 and leaves the automated cells c0040-c0120 empty
+        kyra::Book mb = kyra::generate("demo_manual", "2026-12-31", 42);
+        bool c30 = false, auto_cell = false;
+        for (const auto& f : kyra::aggregate_ra(mb).facts) {
+            if (f.sheet != "W_07.05") continue;
+            std::string col = f.regkey.substr(f.regkey.size() - 5);
+            if (col == "C0030") c30 = true;
+            if (col >= "C0040" && col <= "C0120") auto_cell = true;
+        }
+        CHECK(c30 && !auto_cell);
+    }
     std::set<std::string> sheets;
-    std::map<std::string, double> v;                       // closed cells "W_02.01 C0010" -> value
+    std::map<std::string, double> v;                      // closed cells "W_02.01 C0010" -> value
     std::map<std::string, double> colsum;                  // open-table column sums "W_05.01 C0020"
     std::map<std::pair<int, std::string>, double> geo;     // (W_05.01 row, column) -> value
     for (const auto& f : ra.facts) {

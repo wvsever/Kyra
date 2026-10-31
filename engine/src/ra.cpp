@@ -371,11 +371,16 @@ Module aggregate_ra(const Book& b) {
     alerts = std::max<long long>(alerts, 1);
     long long strs = std::max<long long>(1, alerts / 50);
     o.c("W_07.05", "C0010", "true");
-    o.c("W_07.05", "C0020", "At least partially automated");   // c0030 blank: v903748
-    for (const char* k : {"C0040", "C0050", "C0060", "C0070", "C0080"}) o.c("W_07.05", k, "true");
-    o.c("W_07.05", "C0090", num(std::max<long long>(1, alerts * 4 / 100)));
-    o.c("W_07.05", "C0100", "6.5");
-    o.c("W_07.05", "C0110", num(alerts)); o.c("W_07.05", "C0120", num(strs));
+    if (b.entity_id == "demo_manual") {
+        // K025: not automated (qx2005): c0030 allowed (v903748), c0040-c0120 must be empty (v903749-v903757)
+        o.c("W_07.05", "C0020", "Not automated"); o.c("W_07.05", "C0030", "4.5");
+    } else {
+        o.c("W_07.05", "C0020", "At least partially automated");   // c0030 blank: v903748
+        for (const char* k : {"C0040", "C0050", "C0060", "C0070", "C0080"}) o.c("W_07.05", k, "true");
+        o.c("W_07.05", "C0090", num(std::max<long long>(1, alerts * 4 / 100)));
+        o.c("W_07.05", "C0100", "6.5");
+        o.c("W_07.05", "C0110", num(alerts)); o.c("W_07.05", "C0120", num(strs));
+    }
     o.c("W_07.05", "C0130", "true"); o.c("W_07.05", "C0140", "11.5");
     o.c("W_07.05", "C0150", num(strs + fiu));
     o.c("W_07.06", "C0010", "4");
