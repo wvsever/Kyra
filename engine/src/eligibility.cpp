@@ -79,8 +79,8 @@ Module aggregate_eligibility(const Book& b) {
         o.cell("V_02.01", "L0010", "C0050", b2s(p.aml_supervised));
         o.cell("V_02.01", "L0010", "C0060", p.country);
     }
-    if (b.head_office_outside_eu) {   // V_02.02 only for a non-EU head office (profile demo_third; exclusive with V_02.01)
-        const Parent& p = b.parent;
+    if (b.head_office_outside_eu) {   // V_02.02: non-EU head office (v904921_m, v904893_m); independent of V_02.01
+        const Parent& p = b.head_office;
         o.cell("V_02.02", "L0010", "C0010", p.lei);
         o.cell("V_02.02", "L0010", "C0020", p.national_code);
         o.cell("V_02.02", "L0010", "C0030", p.name);

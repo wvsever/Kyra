@@ -37,7 +37,7 @@ service line), channel (branch, online, intermediary), geography (residence, cou
 | V_00.03, V_00.04 | none: every unconditional cell is filled, no comments needed (K007) |
 | V_01.01 | parent flags, units count, FPS states over head office + branches (K004) |
 | V_02.01 | parent |
-| V_02.02 | parent when the head office is outside the EU; filed only in profile `demo_third` (K023) |
+| V_02.02 | parent when the head office is outside the EU; non-EU head office, filed in the demo next to the EU parent (K023) |
 | V_03.01 | units[1..] (one open row each); c0150 = FPS states of that unit |
 | V_04.01 | customers resident in another EU state than their booking unit, per (unit, state): count, incoming and outgoing sums (K004, K008) |
 

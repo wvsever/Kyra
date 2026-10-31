@@ -18,7 +18,7 @@ check(subprocess.run([exe, "run", "--out", str(work / "x"), "--module", "nope"],
       "unknown module exits 2")
 
 counts = []
-for module, family, workbook, sheets in (("aml_eligibility", "AML_ELIGIBILITY", "AGU_AML_ELIGIBILITY_v100_i.xltx", 5),
+for module, family, workbook, sheets in (("aml_eligibility", "AML_ELIGIBILITY", "AGU_AML_ELIGIBILITY_v100_i.xltx", 6),
                                          ("aml_ra", "AML_RA", "AGU_AML_RA_v110_i.xltx", 34)):
     r = subprocess.run([exe, "run", "--out", str(work / module), "--module", module], capture_output=True, text=True)
     check(r.returncode == 0, f"{module}: run exit {r.returncode}: {r.stderr}")

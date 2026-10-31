@@ -40,6 +40,7 @@ int main(int argc, char** argv) {
     kyra::Module m = kyra::aggregate_eligibility(a);
     std::map<std::string, std::string> closed;    // closed-table regkey -> value
     std::set<std::string> v0401_rows;
+    int n0202 = 0;
     for (const auto& f : m.facts) {
         CHECK(type_of.count(f.regkey) == 1);       // every fact has a regkey in the FC map
         CHECK(!f.value.empty() && f.value != "0" && f.value != "0.00");   // no zeros as data
@@ -48,7 +49,7 @@ int main(int argc, char** argv) {
         if (t == "INTEGER" || t == "AMOUNT") CHECK(std::stod(f.value) > 0);
         if (!f.ordinal) closed[f.regkey] = f.value;
         if (f.sheet == "V_04.01") v0401_rows.insert(std::to_string(f.ordinal));
-        CHECK(f.sheet != "V_02.02");                // v904921_m: no head office outside the EU
+        n0202 += f.sheet == "V_02.02";
     }
     // v904892_m / v905231_m: FPS -> count of member states in 1..27.
     CHECK(closed["TV_01.01-L0010-C0040"] == "true");
@@ -56,19 +57,10 @@ int main(int argc, char** argv) {
     CHECK(n >= 1 && n <= 27);
     CHECK(closed.count("TV_02.01-L0010-C0030") == 1);   // v904889_m
     CHECK(!v0401_rows.empty());
+    CHECK(n0202 == 4 && closed["TV_01.01-L0010-C0020"] == "true");   // v904893_m/v904921_m: head office filed
     int per_row = 0;                                     // v904895/6_m: every V_04.01 row has both amounts
     for (const auto& f : m.facts) if (f.sheet == "V_04.01" && (f.regkey.ends_with("C0050") || f.regkey.ends_with("C0060"))) ++per_row;
     CHECK(per_row == int(2 * v0401_rows.size()));
-
-    // demo_third (K023): non-EU head office -> V_02.02 (v904893_m, v905298_m), no V_02.01 (v904920_m/v904921_m exclusive).
-    kyra::Book t3 = kyra::generate("demo_third", "2026-12-31", 42);
-    int n0201 = 0, n0202 = 0;
-    for (const auto& f : kyra::aggregate_eligibility(t3).facts) {
-        CHECK(type_of.count(f.regkey) == 1 && !f.value.empty());
-        n0201 += f.sheet == "V_02.01";
-        n0202 += f.sheet == "V_02.02";
-    }
-    CHECK(n0201 == 0 && n0202 == 4);
 
     // aml_ra: keys, types, no zeros, every template, and the cross-template rules the generator must honour.
     std::map<std::string, std::string> ra_type;

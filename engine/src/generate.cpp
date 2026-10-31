@@ -55,9 +55,7 @@ std::string lei_with_check_digits(const std::string& prefix18) {
 }
 
 Book generate(const std::string& profile, const std::string& ref_date, std::uint64_t seed) {
-    const bool third = profile == "demo_third";   // K023: head office outside the EU instead of an EU parent
-    if (profile != "demo" && !third)
-        throw std::invalid_argument("unknown entity profile: " + profile + " (known: demo, demo_third)");
+    if (profile != "demo") throw std::invalid_argument("unknown entity profile: " + profile + " (known: demo)");
     Book b;
     b.entity_id = profile;
     b.ref_date = ref_date;
@@ -74,15 +72,14 @@ Book generate(const std::string& profile, const std::string& ref_date, std::uint
                        "Kyra Demo Paiements SAS", "Payment institutions", "FRANCE",
                        "FR - Prudential Supervision and Resolution Authority", "FR-French Financial Markets Authority",
                        "Subsidiary", false});
-    if (third) {
-        b.head_office_outside_eu = true;
-        b.parent = {lei_with_check_digits("KYRA00DEMOHOLDCH00"), "CHE000042", "Kyra Demo Holding AG",
-                    "Kyra Demo Holding AG", "SWITZERLAND", true};
-    } else {
-        b.has_eu_parent = true;
-        b.parent = {lei_with_check_digits("KYRA00DEMOHOLDNL00"), "34000042", "Kyra Demo Holding NV",
-                    "Kyra Demo Holding NV", "NETHERLANDS", true};
-    }
+    // EU parent (V_02.01) and a non-EU head office above it (V_02.02): an EU subgroup of a Swiss group. The VRs
+    // v904920_m/v904921_m test the two flags independently, so both may be filed (K023).
+    b.has_eu_parent = true;
+    b.parent = {lei_with_check_digits("KYRA00DEMOHOLDNL00"), "34000042", "Kyra Demo Holding NV",
+                "Kyra Demo Holding NV", "NETHERLANDS", true};
+    b.head_office_outside_eu = true;
+    b.head_office = {lei_with_check_digits("KYRA00DEMOHOLDCH00"), "CHE000042", "Kyra Demo Holding AG",
+                     "Kyra Demo Holding AG", "SWITZERLAND", true};
 
     const std::vector<std::vector<Mix>> mix = {
         {{"BELGIUM", 85}, {"NETHERLANDS", 8}, {"GERMANY", 7}},

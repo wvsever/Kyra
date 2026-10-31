@@ -17,7 +17,7 @@ struct Unit {
     bool fps = false;              // operates through freedom to provide services (K004)
 };
 
-struct Parent {                    // EU parent undertaking (V_02.01)
+struct Parent {                    // EU parent undertaking (V_02.01) or non-EU head office (V_02.02)
     std::string lei, national_code, name, name_latin, country;
     bool aml_supervised = true;
 };
@@ -87,7 +87,7 @@ struct Book {
     std::uint64_t seed = 0;
     std::vector<Unit> units;
     bool has_eu_parent = false, head_office_outside_eu = false;
-    Parent parent;
+    Parent parent, head_office;
     std::vector<Customer> customers;
     std::vector<Transaction> transactions;
     AmlActivity activity;
