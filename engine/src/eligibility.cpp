@@ -79,7 +79,13 @@ Module aggregate_eligibility(const Book& b) {
         o.cell("V_02.01", "L0010", "C0050", b2s(p.aml_supervised));
         o.cell("V_02.01", "L0010", "C0060", p.country);
     }
-    // V_02.02 stays empty unless the head office is outside the EU (rule v904921_m); no such demo profile yet.
+    if (b.head_office_outside_eu) {   // V_02.02 only for a non-EU head office (profile demo_third; exclusive with V_02.01)
+        const Parent& p = b.parent;
+        o.cell("V_02.02", "L0010", "C0010", p.lei);
+        o.cell("V_02.02", "L0010", "C0020", p.national_code);
+        o.cell("V_02.02", "L0010", "C0030", p.name);
+        o.cell("V_02.02", "L0010", "C0040", p.country);
+    }
 
     int row = 0;
     for (std::size_t i = 1; i < b.units.size(); ++i) {

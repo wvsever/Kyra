@@ -60,6 +60,16 @@ int main(int argc, char** argv) {
     for (const auto& f : m.facts) if (f.sheet == "V_04.01" && (f.regkey.ends_with("C0050") || f.regkey.ends_with("C0060"))) ++per_row;
     CHECK(per_row == int(2 * v0401_rows.size()));
 
+    // demo_third (K023): non-EU head office -> V_02.02 (v904893_m, v905298_m), no V_02.01 (v904920_m/v904921_m exclusive).
+    kyra::Book t3 = kyra::generate("demo_third", "2026-12-31", 42);
+    int n0201 = 0, n0202 = 0;
+    for (const auto& f : kyra::aggregate_eligibility(t3).facts) {
+        CHECK(type_of.count(f.regkey) == 1 && !f.value.empty());
+        n0201 += f.sheet == "V_02.01";
+        n0202 += f.sheet == "V_02.02";
+    }
+    CHECK(n0201 == 0 && n0202 == 4);
+
     // aml_ra: keys, types, no zeros, every template, and the cross-template rules the generator must honour.
     std::map<std::string, std::string> ra_type;
     if (argc >= 3) {
