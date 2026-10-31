@@ -385,7 +385,8 @@ Module aggregate_ra(const Book& b) {
     // W_07.07: group entities = branch + subsidiary; one of two reports on deficiencies (K022).
     o.c("W_07.07", "C0010", "1.0000"); o.c("W_07.07", "C0020", "1.0000"); o.c("W_07.07", "C0030", "1.0000");
     o.c("W_07.07", "C0040", "1.0000"); o.c("W_07.07", "C0050", "0.5000"); o.c("W_07.07", "C0060", "1.0000");
-    o.c("W_07.07", "C0070", "1");   // c0080 blank: no group entity outside the EU/EEA
+    o.c("W_07.07", "C0070", "1");
+    o.c("W_07.07", "C0080", "1");   // the CH head office (K023) is the group entity outside the EU/EEA (K024; v904610_s_2)
 
     o.cell("W_08.01", "L0380", "C0010", money(a.total_assets));
     return m;

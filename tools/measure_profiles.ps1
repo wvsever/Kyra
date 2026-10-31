@@ -2,18 +2,18 @@
 # Kyra measure: every entity profile -> FC CSV -> PMR -> Yena (lanetools pmr_yena.ps1 script, no lt); prints per profile
 # executed/unsat and the union (rules executed in >= 1 profile / reachable). Reachable = rules not gated on the V_00.01
 # filing indicator (TRAPS T1, owner decision pending). Usage:
-#   pwsh -NoProfile -File tools/measure_profiles.ps1 -Kyra <kyra.exe> -Agu <agu> [-Profiles demo] [-Out dir]
-param([Parameter(Mandatory)][string]$Kyra, [Parameter(Mandatory)][string]$Agu, [string[]]$Profiles = @('demo'),
+#   pwsh -NoProfile -File tools/measure_profiles.ps1 -Kyra <kyra.exe> -Agu <agu> [-Profiles demo] [-Module aml_ra] [-Out dir]
+param([Parameter(Mandatory)][string]$Kyra, [Parameter(Mandatory)][string]$Agu, [string[]]$Profiles = @('demo'), [ValidateSet('aml_eligibility','aml_ra')][string]$Module = 'aml_eligibility',
       [string]$Out = "$env:TEMP/kyra_profiles", [string]$PmrYena = 'F:/wvs_git_sources/lanetools/scripts/pmr_yena.ps1')
 $ErrorActionPreference = 'Stop'
 $executed = @{}; $reach = @{}; $unsat = @{}
 foreach ($p in $Profiles) {
     $d = "$Out/$p"
-    & $Kyra run --out $d --module aml_eligibility --entity $p | Out-Null
+    & $Kyra run --out $d --module $Module --entity $p | Out-Null
     if ($LASTEXITCODE) { throw "kyra failed for $p" }
-    $csv = "$d/factsconverter/fc_import_AML_ELIGIBILITY.csv"
+    $csv = "$d/factsconverter/fc_import_$($Module.ToUpper()).csv"
     & pwsh -NoProfile -File $PmrYena $csv --agu $Agu --out "$d/y" | Out-Null
-    $pre = "$d/y/fc_import_AML_ELIGIBILITY"
+    $pre = "$d/y/fc_import_$($Module.ToUpper())"
     $gated = @{}
     foreach ($l in Get-Content "$pre.diag.jsonl") {
         if (-not $l.StartsWith('{')) { continue }
